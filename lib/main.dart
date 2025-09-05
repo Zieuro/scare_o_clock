@@ -18,7 +18,6 @@ class ScareRotationsApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      debugShowCheckedModeBanner: false,
       title: 'Scare Rotations',
       theme: ThemeData.dark(),
       home: const RotationScreen(),
@@ -133,6 +132,8 @@ class _RotationScreenState extends State<RotationScreen> {
     DateTime t(int hour12, int minute, bool isPm) {
       final now = DateTime.now();
       int hour24 = hour12 % 12 + (isPm ? 12 : 0);
+      if (hour12 == 12 && !isPm) hour24 = 0;
+      if (hour12 == 12 && isPm) hour24 = 12;
       return DateTime(now.year, now.month, now.day, hour24, minute);
     }
 
@@ -185,8 +186,14 @@ class _RotationScreenState extends State<RotationScreen> {
     return null;
   }
 
+  Slot? _nextBoundary(DateTime now) {
+    for (final s in _today) {
+      if (s.start.isAfter(now)) return s;
+    }
+    return null;
+  }
 
-  // ---------- Rendering ----------
+  // ---------- Rendering Helpers ----------
   String _namesWith(Status st, Slot s) {
     final names = <String>[];
     if (s.a == st) names.add('A');
@@ -219,15 +226,71 @@ class _RotationScreenState extends State<RotationScreen> {
     return '$mm:$ss';
   }
 
+  // Pre-show helpers
+  DateTime _eventDayAt(int hour24, int minute) {
+    var now = DateTime.now();
+    if (now.hour < 2) now = now.subtract(const Duration(days: 1));
+    return DateTime(now.year, now.month, now.day, hour24, minute);
+  }
+
+  String _prettyHMS(Duration d) {
+    final total = d.inSeconds;
+    if (total <= 0) return '00:00';
+    final h = total ~/ 3600;
+    final m = (total % 3600) ~/ 60;
+    final s = total % 60;
+    return h > 0
+        ? '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}'
+        : '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+  }
+
+  // ---------- Build ----------
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
+    final callTime = _eventDayAt(18, 0); // 6:00 PM
+    final startTime = _eventDayAt(19, 0); // 7:00 PM
+
     final slot = _currentSlot(now);
+    final next = _nextBoundary(now);
     final timeFmt = DateFormat.jm();
+
+    Widget preShow() {
+      if (now.isBefore(callTime)) {
+        final remaining = callTime.difference(now);
+        return Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text('Be at venue in', style: TextStyle(fontSize: 20)),
+            const SizedBox(height: 8),
+            Text(_prettyHMS(remaining),
+                style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Text('Call time: ${timeFmt.format(callTime)}',
+                style: const TextStyle(color: Colors.grey)),
+          ],
+        );
+      } else if (now.isBefore(startTime)) {
+        final remaining = startTime.difference(now);
+        return Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text('Event starts in', style: TextStyle(fontSize: 20)),
+            const SizedBox(height: 8),
+            Text(_prettyHMS(remaining),
+                style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Text('Show time: ${timeFmt.format(startTime)}',
+                style: const TextStyle(color: Colors.grey)),
+          ],
+        );
+      }
+      return const SizedBox.shrink();
+    }
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('HOS Rotations'),
+        title: const Text('Actor Rotations'),
         actions: [
           IconButton(
             tooltip: 'Arm notifications',
@@ -245,36 +308,40 @@ class _RotationScreenState extends State<RotationScreen> {
       ),
       body: Center(
         child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: slot == null
-              ? const Text('No active slot right now',
-                  style: TextStyle(fontSize: 20))
-              : Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      '${timeFmt.format(slot.start)} – ${timeFmt.format(slot.end)}',
-                      style: const TextStyle(fontSize: 18, color: Colors.grey),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      _namesWith(Status.onSet, slot).isEmpty
-                          ? 'No one is on set'
-                          : '${_namesWith(Status.onSet, slot)} are ON SET',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                          fontSize: 28, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 16),
-                    _statusLine('Meal', Status.meal, slot),
-                    _statusLine('Off Set', Status.offSet, slot),
-                    const SizedBox(height: 30),
-                    Text(
-                      'Next rotation in ${_pretty(slot.end.difference(now))}',
-                      style: const TextStyle(fontSize: 18),
-                    ),
-                  ],
-                ),
+          padding: const EdgeInsets.all(18),
+          child: now.isBefore(startTime)
+              ? preShow()
+              : (slot == null
+                  ? const Text('No active slot right now',
+                      style: TextStyle(fontSize: 20))
+                  : Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          '${timeFmt.format(slot.start)} – ${timeFmt.format(slot.end)}',
+                          style: const TextStyle(fontSize: 18, color: Colors.grey),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          _namesWith(Status.onSet, slot).isEmpty
+                              ? 'No one is on set'
+                              : '${_namesWith(Status.onSet, slot)} are ON SET',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                              fontSize: 28, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 16),
+                        _statusLine('Meal', Status.meal, slot),
+                        _statusLine('Off Set', Status.offSet, slot),
+                        const SizedBox(height: 30),
+                        Text(
+                          'Next rotation in ${_pretty(slot.end.difference(now))}',
+                          style: const TextStyle(fontSize: 18),
+                        ),
+                        if (next != null)
+                          Text('Next starts at ${timeFmt.format(next.start)}'),
+                      ],
+                    )),
         ),
       ),
     );
