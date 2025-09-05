@@ -18,6 +18,7 @@ class ScareRotationsApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      debugShowCheckedModeBanner: false,
       title: 'Scare Rotations',
       theme: ThemeData.dark(),
       home: const RotationScreen(),
@@ -338,7 +339,7 @@ class _RotationScreenState extends State<RotationScreen> {
                       ? const Text('No active slot right now',
                           style: TextStyle(fontSize: 20))
                       : Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                            mainAxisAlignment: MainAxisAlignment.start,
                           children: [
                             Text(
                               '${timeFmt.format(slot.start)} – ${timeFmt.format(slot.end)}',
