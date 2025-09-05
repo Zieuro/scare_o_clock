@@ -133,8 +133,6 @@ class _RotationScreenState extends State<RotationScreen> {
     DateTime t(int hour12, int minute, bool isPm) {
       final now = DateTime.now();
       int hour24 = hour12 % 12 + (isPm ? 12 : 0);
-      if (hour12 == 12 && !isPm) hour24 = 0;
-      if (hour12 == 12 && isPm) hour24 = 12;
       return DateTime(now.year, now.month, now.day, hour24, minute);
     }
 
